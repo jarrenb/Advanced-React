@@ -5,6 +5,7 @@ import Title from "./styles/Title";
 import ItemStyles from "./styles/ItemStyles";
 import PriceTag from "./styles/PriceTag";
 import FormatMoney from "../lib/formatMoney";
+import DeleteItem from "./DeleteItem";
 
 class Item extends Component {
   static propTypes = {
@@ -28,7 +29,7 @@ class Item extends Component {
         </Title>
         <PriceTag>{FormatMoney(item.price)}</PriceTag>
         <p>{item.description}</p>
-        <div class="buttonList">
+        <div className="buttonList">
           <Link
             href={{
               pathname: "update",
@@ -38,7 +39,7 @@ class Item extends Component {
             <a>Edit</a>
           </Link>
           <button>Add to cart</button>
-          <button>Delete</button>
+          <DeleteItem id={item.id}>Delete This Item</DeleteItem>
         </div>
       </ItemStyles>
     );
