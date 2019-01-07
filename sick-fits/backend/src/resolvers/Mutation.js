@@ -3,12 +3,23 @@ const jwt = require("jsonwebtoken");
 const { randomBytes } = require("crypto");
 const { promisify } = require("util");
 const { transport, makeANiceEmail } = require("../mail");
+const { hasPermission } = require("../utils");
 
 const mutations = {
   async createItem(parent, args, ctx, info) {
+    if (!ctx.request.userId) {
+      throw new Error("you must be logged in to do that!");
+    }
+
     const item = await ctx.db.mutation.createItem(
       {
         data: {
+          // this is how to create a relationship between the item and the user
+          user: {
+            connect: {
+              id: ctx.request.userId
+            }
+          },
           ...args
         }
       },
@@ -34,7 +45,15 @@ const mutations = {
   },
   async deleteItem(parent, args, ctx, info) {
     const where = { id: args.id };
-    const item = await ctx.db.query.item({ where }, `{ id, title }`);
+    const item = await ctx.db.query.item({ where }, `{ id title user { id }}`);
+    // check if they own that item or have the permissions
+    const ownsItem = item.user.id === ctx.request.userId;
+    const hasPermissions = ctx.request.user.permissions.some(permission =>
+      ["ADMIN", "ITEMDELETE"].includes(permission)
+    );
+    if (!ownsItem && !hasPermissions) {
+      throw new Error("you don't have permission to do that!");
+    }
     return ctx.db.mutation.deleteItem({ where }, info);
   },
   async signup(parent, args, ctx, info) {
@@ -132,6 +151,35 @@ const mutations = {
       maxAge: 1000 * 60 * 60 * 24 * 365
     });
     return updatedUser;
+  },
+  async updatePermissions(parent, args, ctx, info) {
+    // check if they are logged in
+    if (!ctx.request.userId) {
+      throw new Error("you must be logged in");
+    }
+    // query the current user
+    const currentUser = await ctx.db.query.user(
+      {
+        where: { id: ctx.request.userId }
+      },
+      info
+    );
+    // check if they have permissions to do this
+    hasPermission(currentUser, ["ADMIN", "PERMISSIONUPDATE"]);
+    // update the permissions
+    return ctx.db.mutation.updateUser(
+      {
+        data: {
+          permissions: {
+            set: args.permissions
+          }
+        },
+        where: {
+          id: args.userId
+        }
+      },
+      info
+    );
   }
 };
 
